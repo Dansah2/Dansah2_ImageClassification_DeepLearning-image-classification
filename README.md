@@ -1,49 +1,72 @@
-# 4Geeks data science project boilerplate
+# Image classification environment set-up
 
-Minimal Python 3.11 repository for 4Geeks data science assignments. Several useful Python packages and VSCode extensions are installed on Codespace boot-up. Directories for models and data are created within the Codespace but excluded from tracking.
+Using this fork will get you up and running in a codespace in just a few minutes.
 
-## 1. Set-up
+## 1. Get a Kaggle account
 
-Fork this repository by clicking the *Fork* button at the upper right. Make sure to set 4Geeks as the owner of the new fork - this way 4Geeks pays for your codespace usage. Then start a Codespace on your fork by clicking the green *Code* button and then '**+**' icon under Codespaces in the drop-down menu.
+The dataset is hosted on Kaggle. To download it you need a free account. It's easy to set up via the following link:
 
-## 2. Environment
+[Login or Register | Kaggle](https://www.kaggle.com/account/login?phase=startRegisterTab)
 
-### 2.1. Repository structure
+After setting up your account you will need to verify with a phone number to use the Kaggle API. You can do this from the *settings* tab in the menu revealed by clicking your profile picture at the top right of any Kaggle page.
 
-```text
-.
-├──.devcontainer
-│   └── devcontainer.json
-│
-├── src
-│   └── project.ipynb
-│
-├── .gitignore
-├── LICENSE
-├── README.md
-└── requirements.txt
+Once you are registered and logged in:
+
+- Go to the [Dogs vs Cats competition](https://www.kaggle.com/competitions/dogs-vs-cats) page
+- Go to the 'Data' tab
+- Scroll down and click 'Join competition'
+
+Now, you need to generate and save an API access token so that you can download the dataset from within a codespace:
+
+- From the kaggle homepage, click on your profile picture in the upper right
+- Select 'Settings'
+- Scroll down, under API, click 'Create New Token'
+- Click 'Continue'
+- Save the key file on you local machine
+
+The contents of the file should look like this:
+
+```json
+{"username":"your-user-name","key":"a-bunch-of-letters-and-numbers"}
 ```
 
-### 2.2. Python
-**Base image**: [Python 3.11](https://github.com/devcontainers/images/tree/main/src/python)
+## 2. Start a codespace
 
-Packages installed via `requirements.txt`:
+Once you have your Kaggle username and API key, fork this repository and start a Codespace as you normally would.
 
-1. [numpy 2.2.3](https://numpy.org/doc/stable/index.html)
-2. [pandas 2.2.3](https://pandas.pydata.org/docs/)
-3. [scikit-learn 1.6.1](https://scikit-learn.org/stable/index.html)
-4. [matplotlib 3.10.1](https://matplotlib.org/stable/index.html)
-5. [seaborn 0.13.2](https://seaborn.pydata.org/)
-6. [ipykernel 6.29.5](https://pypi.org/project/ipykernel/)
+## 3. Add your Kaggle API key
 
-If you need to install additional Python packages, you can do so via the terminal with: `pip install packagename`.
+From your codespace, open the .env file and add your Kaggle username and key from the `kaggle.json` file you downloaded to your computer from the Kaggle site earlier.
 
-### 2.3. VSCode extensions
 
-Sepcified via `devcontainier.json`.
+```bash
+export KAGGLE_USERNAME=your-user-name
+export KAGGLE_KEY=a-bunch-of-letters-and-numbers
+```
 
-1. [ms-python.python](https://marketplace.visualstudio.com/items?itemName=ms-python.python)
-2. [ms-toolsai.jupyter](https://marketplace.visualstudio.com/items?itemName=ms-toolsai.jupyter)
-3. [streetsidesoftware.code-spell-checker](https://marketplace.visualstudio.com/items?itemName=streetsidesoftware.code-spell-checker)
+Then, source the environment file to export the environment variables to the codespace shell:
 
-VSCode extensions can be added via the *Extensions* tab located on the activities panel at the left once inside the Codespace.
+```bash
+source .env
+```
+
+Now, your username and key are stored in `KAGGLE_USERNAME` and `KAGGLE_KEY` respectively. Placing them in environment variables makes them available to any application running in the codespace. Test it by running the following command in the terminal:
+
+```bash
+echo $KAGGLE_USERNAME
+```
+
+It should print your Kaggle username.
+
+## 4. Download and prepare the data
+
+I have placed a series of commands to download and organize the images in a shell script for you. To use the script, you need to make it executable and then run it. From you codespace terminal run the following commands:
+
+```bash
+sudo chmod u+x ./get_data.sh
+./get_data.sh
+```
+
+The script downloads the data from Kaggle, decompresses it and moves the training cats and dogs into separate directories.
+
+Easy! Now we can work with the data in a Jupyter notebook. Open `src/mvp.ipynb` to get started.
