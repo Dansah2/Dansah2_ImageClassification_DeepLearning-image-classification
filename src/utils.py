@@ -2,9 +2,13 @@
 
 
 # Handle imports up-front
-import os.path
+import os
 import itertools
 import pickle
+from typing import Tuple
+
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+
 import numpy as np
 import tensorflow as tf
 import matplotlib.pyplot as plt
@@ -12,7 +16,6 @@ import matplotlib.pyplot as plt
 from tensorflow import keras
 from tensorflow.keras import layers
 from tensorflow.keras.models import Sequential
-from keras.preprocessing import image
 
 # Set some global default values for how long/how much to train
 SINGLE_TRAINING_RUN_EPOCHS=100
@@ -25,38 +28,46 @@ OPTIMIZATION_TRAINING_RUN_VALIDATION_STEPS=10
 
 
 # Define a re-usable helper function to create training and validation datasets
-def make_datasets(training_data_path: str, image_width: int, image_height: int, batch_size: int=32):
+def make_datasets(
+        training_data_path: str,
+        image_width: int,
+        image_height: int, 
+        batch_size: int=32,
+        steps_per_epoch: int=50,
+        epochs: int=10
+) -> Tuple[tf.data.Dataset, tf.data.Dataset]:
+    
     '''Makes training and validation dataset generator objects.'''
 
-    training_dataset=tf.keras.utils.image_dataset_from_directory(
+    training_dataset, validation_dataset=tf.keras.utils.image_dataset_from_directory(
         training_data_path,
         validation_split=0.2,
-        subset='training',
+        subset='both',
         seed=315,
+        shuffle=True,
         image_size=(image_width, image_height),
         color_mode='grayscale',
         batch_size=batch_size
     )
 
-    validation_dataset=tf.keras.utils.image_dataset_from_directory(
-        training_data_path,
-        validation_split=0.2,
-        subset='validation',
-        seed=315,
-        image_size=(image_width, image_height),
-        color_mode='grayscale',
-        batch_size=batch_size
-    )
+    epoch_images=batch_size*steps_per_epoch
+    total_images=epoch_images*epochs
 
-    AUTOTUNE=tf.data.AUTOTUNE
-
-    training_dataset=training_dataset.cache().shuffle(256, reshuffle_each_iteration=True).prefetch(buffer_size=AUTOTUNE)
-    validation_dataset=training_dataset.cache().shuffle(256, reshuffle_each_iteration=True).prefetch(buffer_size=AUTOTUNE)
+    training_dataset=training_dataset.cache().shuffle(total_images, reshuffle_each_iteration=True).prefetch(buffer_size=total_images).repeat()
+    validation_dataset=training_dataset.cache().shuffle(total_images, reshuffle_each_iteration=True).prefetch(buffer_size=total_images).repeat()
 
     return training_dataset, validation_dataset
 
 
-def compile_model(training_dataset, image_width, image_height, learning_rate, l1, l2):
+def compile_model(
+        training_dataset: tf.data.Dataset,
+        image_width: int,
+        image_height: int,
+        learning_rate: float,
+        l1: float,
+        l2: float
+) -> tf.keras.Model:
+
     '''Builds the convolutional neural network classification model'''
 
     # Define and adapt a normalization layer. This step uses a sample of images 
@@ -109,7 +120,8 @@ def single_training_run(
         epochs: int=SINGLE_TRAINING_RUN_EPOCHS,
         steps_per_epoch: int=SINGLE_TRAINING_RUN_STEPS_PER_EPOCH,
         validation_steps: int=SINGLE_TRAINING_RUN_VALIDATION_STEPS
-):
+) -> keras.callbacks.History:
+    
     '''Does one training run.'''
 
     # Get dictionary of all arguments being passed into function
@@ -121,6 +133,7 @@ def single_training_run(
     for key, value in named_args.items():
         if key != 'training_data_path':
             results_file+=f'_{value}'
+
     results_file+='.plk'
 
     # Check if we have already run this experiment, if not, run it and save the results
@@ -134,7 +147,9 @@ def single_training_run(
             training_data_path,
             image_width,
             image_height,
-            batch_size
+            batch_size,
+            steps_per_epoch,
+            epochs
         )
 
         # Make the model
@@ -163,12 +178,17 @@ def single_training_run(
 
     # If we have already run it, load the result so we can plot it
     elif os.path.isfile(results_file) == True:
+
+        print('Training run already complete, loading results from disk.')
+
         with open(results_file, 'rb') as output_file:
             training_result=pickle.load(output_file)
 
+
     return training_result
 
-def plot_single_training_run(training_results):
+
+def plot_single_training_run(training_results: keras.callbacks.History) -> plt:
     '''Takes a training results dictionary, plots it.'''
 
     # Set-up a 1x2 figure for accuracy and binary cross-entropy
@@ -192,8 +212,7 @@ def plot_single_training_run(training_results):
     axs[1].set_xlabel('Epoch')
     axs[1].set_ylabel('Binary cross-entropy')
 
-    # Show the plot
-    plt.tight_layout()
+    fig.tight_layout()
 
     return plt
 
@@ -209,7 +228,8 @@ def hyperparameter_optimization_run(
         epochs: int=OPTIMIZATION_TRAINING_RUN_EPOCHS,
         steps_per_epoch: int=OPTIMIZATION_TRAINING_RUN_STEPS_PER_EPOCH,
         validation_steps: int=OPTIMIZATION_TRAINING_RUN_VALIDATION_STEPS
-):
+) -> keras.callbacks.History:
+    
     '''Does hyperparameter optimization run'''
 
     # Get dictionary of all arguments being passed into function
@@ -245,10 +265,24 @@ def hyperparameter_optimization_run(
             image_height=int(image_width / aspect_ratio)
 
             # Make the datasets with the batch size for this run
-            training_dataset, validation_dataset=make_datasets(training_data_path, image_width, image_height, batch_size)
+            training_dataset, validation_dataset=make_datasets(
+                training_data_path,
+                image_width,
+                image_height, 
+                batch_size,
+                steps_per_epoch,
+                epochs
+            )
 
             # Compile the model with the learning rate for this run
-            model=compile_model(training_dataset, image_width, image_height, learning_rate, l1, l2)
+            model=compile_model(
+                training_dataset,
+                image_width,
+                image_height,
+                learning_rate,
+                l1,
+                l2
+            )
 
             # Do the training run
             hyperparameter_optimization_result=model.fit(
@@ -269,6 +303,9 @@ def hyperparameter_optimization_run(
 
     # If we have already run it, load the result so we can plot it
     elif os.path.isfile(results_file) == True:
+
+        print('Optimization run already complete, loading results from disk.')
+
         with open(results_file, 'rb') as output_file:
             hyperparameter_optimization_results=pickle.load(output_file)
 
@@ -294,7 +331,7 @@ def plot_hyperparameter_optimization_run(
     }
     
     # Set-up a 1x2 figure for accuracy and binary cross-entropy
-    _, axs=plt.subplots(
+    fig, axs=plt.subplots(
         len(hyperparameter_optimization_results), 
         2, 
         figsize=(8,3*len(hyperparameter_optimization_results))
@@ -339,6 +376,6 @@ def plot_hyperparameter_optimization_run(
         axs[i,1].set_ylabel('Binary cross-entropy')
         axs[i,1].legend(loc='best')
 
-    plt.tight_layout()
+    fig.tight_layout()
 
     return plt
