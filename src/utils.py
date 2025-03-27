@@ -16,6 +16,14 @@ from tensorflow.keras import layers
 from tensorflow.keras.models import Sequential
 
 # Set some global default values for how long/how much to train
+BATCH_SIZE=8
+LEARNING_RATE=0.1
+L1_PENALTY=0
+L2_PENALTY=0
+IMAGE_HEIGHT=64
+IMAGE_WIDTH=48
+ASPECT_RATIO=4/3
+
 SINGLE_TRAINING_RUN_EPOCHS=100
 SINGLE_TRAINING_RUN_STEPS_PER_EPOCH=50
 SINGLE_TRAINING_RUN_VALIDATION_STEPS=50
@@ -28,11 +36,12 @@ OPTIMIZATION_TRAINING_RUN_VALIDATION_STEPS=10
 # Define a re-usable helper function to create training and validation datasets
 def make_datasets(
         training_data_path: str,
-        image_width: int,
-        image_height: int, 
-        batch_size: int=32,
-        steps_per_epoch: int=50,
-        epochs: int=10
+        image_width: int=IMAGE_WIDTH,
+        image_height: int=IMAGE_HEIGHT, 
+        batch_size: int=BATCH_SIZE,
+        steps_per_epoch: int=SINGLE_TRAINING_RUN_STEPS_PER_EPOCH,
+        epochs: int=SINGLE_TRAINING_RUN_EPOCHS,
+        prefetch: bool=True
 ) -> Tuple[tf.data.Dataset, tf.data.Dataset]:
     
     '''Makes training and validation dataset generator objects.'''
@@ -48,22 +57,29 @@ def make_datasets(
         batch_size=batch_size
     )
 
-    epoch_images=batch_size*steps_per_epoch
-    total_images=epoch_images*epochs
+    if prefetch is True:
 
-    training_dataset=training_dataset.cache().shuffle(total_images, reshuffle_each_iteration=True).prefetch(buffer_size=total_images).repeat()
-    validation_dataset=training_dataset.cache().shuffle(total_images, reshuffle_each_iteration=True).prefetch(buffer_size=total_images).repeat()
+        epoch_images=batch_size*steps_per_epoch
+        total_images=epoch_images*epochs
+
+        training_dataset=training_dataset.cache().shuffle(total_images, reshuffle_each_iteration=True).prefetch(buffer_size=total_images).repeat()
+        validation_dataset=training_dataset.cache().shuffle(total_images, reshuffle_each_iteration=True).prefetch(buffer_size=total_images).repeat()
+    
+    else:
+
+        training_dataset=training_dataset.repeat()
+        validation_dataset=validation_dataset.repeat()
 
     return training_dataset, validation_dataset
 
 
 def compile_model(
         training_dataset: tf.data.Dataset,
-        image_width: int,
-        image_height: int,
-        learning_rate: float,
-        l1: float,
-        l2: float
+        image_width: int=IMAGE_WIDTH,
+        image_height: int=IMAGE_HEIGHT,
+        learning_rate: float=LEARNING_RATE,
+        l1: float=L1_PENALTY,
+        l2: float=L2_PENALTY
 ) -> tf.keras.Model:
 
     '''Builds the convolutional neural network classification model'''
@@ -109,12 +125,12 @@ def compile_model(
 
 def single_training_run(
         training_data_path: str,
-        image_width: int=128,
-        aspect_ratio: float=4/3,
-        batch_size: int=16,
-        learning_rate: float=0.1,
-        l1_penalty: float=0.0,
-        l2_penalty: float=0.0,
+        image_width: int=IMAGE_WIDTH,
+        aspect_ratio: float=ASPECT_RATIO,
+        batch_size: int=BATCH_SIZE,
+        learning_rate: float=LEARNING_RATE,
+        l1_penalty: float=L1_PENALTY,
+        l2_penalty: float=L2_PENALTY,
         epochs: int=SINGLE_TRAINING_RUN_EPOCHS,
         steps_per_epoch: int=SINGLE_TRAINING_RUN_STEPS_PER_EPOCH,
         validation_steps: int=SINGLE_TRAINING_RUN_VALIDATION_STEPS
@@ -217,12 +233,12 @@ def plot_single_training_run(training_results: keras.callbacks.History) -> plt:
 
 def hyperparameter_optimization_run(
         training_data_path: str,
-        image_widths: int=[128],
-        aspect_ratio: int=4/3,
-        batch_sizes: list=[16],
-        learning_rates: list=[0.1],
-        l1_penalties: list=[0.0],
-        l2_penalties: list=[0.0],
+        image_widths: int=[IMAGE_WIDTH],
+        batch_sizes: list=[BATCH_SIZE],
+        learning_rates: list=[LEARNING_RATE],
+        l1_penalties: list=[L1_PENALTY],
+        l2_penalties: list=[L2_PENALTY],
+        aspect_ratio: int=ASPECT_RATIO,
         epochs: int=OPTIMIZATION_TRAINING_RUN_EPOCHS,
         steps_per_epoch: int=OPTIMIZATION_TRAINING_RUN_STEPS_PER_EPOCH,
         validation_steps: int=OPTIMIZATION_TRAINING_RUN_VALIDATION_STEPS
@@ -236,9 +252,14 @@ def hyperparameter_optimization_run(
     # Make output file name string using values of arguments
     # from function call
     results_file='../data/experiment_results/optimization_run'
+    
     for key, value in named_args.items():
         if key != 'training_data_path':
-            results_file+=f'_{value}'
+            if isinstance(value, list):
+                results_file+=f'_{value[0]}'
+            else:
+                results_file+=f'_{value}'
+
     results_file+='.plk'
 
     # Check if we have already run this experiment, if not, run it and save the results
