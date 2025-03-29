@@ -9,17 +9,17 @@ kaggle competitions download dogs-vs-cats -p data/raw
 # Decompress the data
 unzip data/raw/dogs-vs-cats.zip -d data/raw
 
-# mkdir data/interim/train
-# mkdir data/interim/test1
+# Decompress the training and testing data
 unzip data/raw/train.zip -d data/interim
 unzip data/raw/test1.zip -d data/interim
 
-# Move the training dogs and cats into separate directories
+# Make target directories for training and testing data
 mkdir data/processed/train
 mkdir data/processed/test
 mkdir data/processed/train/dog
 mkdir data/processed/train/cat
 
+# Move the training dogs and cats and the testing data
 mv data/interim/train/dog.* data/processed/train/dog/
 mv data/interim/train/cat.* data/processed/train/cat/
 mv data/interim/test1/* data/processed/test/
